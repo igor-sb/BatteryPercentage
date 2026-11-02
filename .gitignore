@@ -1,0 +1,22 @@
+# Build artifacts
+BatteryMenuBar
+BatteryMenuBar.app/
+build/
+DerivedData/
+
+# Xcode generated project (re-generate with: swift generate_xcodeproj.swift)
+BatteryPercentage.xcodeproj/
+
+# Xcode user data
+xcuserdata/
+*.xcworkspace/
+*.xcscmblueprint
+
+# macOS
+.DS_Store
+._*
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Packages/

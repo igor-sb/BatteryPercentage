@@ -11,6 +11,7 @@ Compiles straight to ARM64/x86_64 machine code via LLVM — no Electron, no web 
 | | macOS (Menu Bar) | iOS (Widget) |
 |---|---|---|
 | **Battery %** | ✅ Real-time in menu bar | ✅ Home & Lock Screen |
+| **Remaining time** | ✅ Select instead of percentage | — |
 | **Battery icon** | ✅ SF Symbol, adapts to level | ✅ SF Symbol, color-coded |
 | **Charging indicator** | ✅ Bolt icon + status | ✅ Bolt icon + label |
 | **Details dropdown** | ✅ Time remaining, cycle count, health | — |
@@ -40,6 +41,14 @@ make build    # → ./BatteryMenuBar (standalone binary)
 make bundle   # → ./BatteryMenuBar.app (proper .app bundle)
 ```
 
+### Choose the Menu Bar Display
+
+Click the battery icon and select **Show Percentage** (the default) or **Show Remaining Time**.
+The selected option is checked, updates immediately, and is remembered after quitting the app.
+Time mode shows estimated battery life, or time until full while charging. It shows
+“Calculating…” when macOS has no estimate, and “Full” or “Plugged In” when connected
+without charging. Hover over the menu bar item for the full status and time details.
+
 ### How It Works
 
 The macOS app is a **single Swift file** (`macOS/BatteryMenuBar.swift`) that:
@@ -47,7 +56,7 @@ The macOS app is a **single Swift file** (`macOS/BatteryMenuBar.swift`) that:
 1. Queries the kernel's power subsystem via **IOKit** (`IOPSCopyPowerSourcesInfo`) — the lowest-level public API for battery data on macOS
 2. Registers an **IOPSNotificationCreateRunLoopSource** callback so the display updates the instant the kernel reports a change (plug/unplug, charge level)
 3. Runs a 60-second fallback timer as a safety net
-4. Displays the percentage + an SF Symbol battery icon in the **system menu bar**
+4. Displays the selected percentage or remaining time + an SF Symbol battery icon in the **system menu bar**
 5. Shows a dropdown with: status, time remaining, cycle count, and battery health
 
 The binary compiles with `swiftc -O` — a single LLVM pass produces optimised native machine code. No frameworks are embedded; Cocoa and IOKit are dynamically linked from the system.

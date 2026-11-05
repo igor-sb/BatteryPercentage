@@ -1,5 +1,5 @@
 //  BatteryMenuBar.swift
-//  Lightweight macOS menu bar battery percentage display.
+//  Lightweight macOS menu bar battery percentage and remaining time display.
 //
 //  Build:  swiftc -O -framework Cocoa -framework IOKit BatteryMenuBar.swift -o BatteryMenuBar
 //  The compiled binary is a single ~200 KB native ARM64/x86_64 executable — zero dependencies.
@@ -104,11 +104,25 @@ struct BatteryReading {
 
     var statusText: String {
         if isCharging  { return "Charging" }
-        if isPluggedIn { return "Plugged In — Full" }
+        if isPluggedIn { return percentage >= 100 ? "Plugged In — Full" : "Plugged In — Not Charging" }
         return "On Battery"
     }
 
+    /// Compact estimate for the menu bar; macOS may not have an estimate yet.
+    var menuBarTimeText: String {
+        if isPluggedIn && !isCharging {
+            return percentage >= 100 ? "Full" : "Plugged In"
+        }
+        let minutes = isCharging ? minutesToFull : minutesToEmpty
+        guard minutes >= 0 else { return "Calculating…" }
+        if isCharging && minutes == 0 { return "Full" }
+        return format(minutes: minutes)
+    }
+
     var timeText: String {
+        if isPluggedIn && !isCharging {
+            return percentage >= 100 ? "Fully Charged" : "Not Charging"
+        }
         if isCharging {
             guard minutesToFull >= 0 else { return "Calculating…" }
             if minutesToFull == 0 { return "Fully Charged" }
@@ -136,6 +150,23 @@ final class BatteryApp: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var runLoopSource: CFRunLoopSource?
     private var fallbackTimer: Timer?
+
+    private enum DisplayMode: String {
+        case percentage
+        case remainingTime
+    }
+
+    private static let displayModeKey = "menuBarDisplayMode"
+    private var displayMode = DisplayMode(
+        rawValue: UserDefaults.standard.string(forKey: displayModeKey) ?? ""
+    ) ?? .percentage
+
+    private let percentageMenuItem = NSMenuItem(
+        title: "Show Percentage", action: #selector(selectPercentage), keyEquivalent: ""
+    )
+    private let remainingTimeMenuItem = NSMenuItem(
+        title: "Show Remaining Time", action: #selector(selectRemainingTime), keyEquivalent: ""
+    )
 
     // Dynamic menu items
     private let statusMenuItem = NSMenuItem(title: "—", action: nil, keyEquivalent: "")
@@ -183,10 +214,36 @@ final class BatteryApp: NSObject, NSApplicationDelegate {
         menu.addItem(cycleMenuItem)
         menu.addItem(healthMenuItem)
         menu.addItem(NSMenuItem.separator())
+        percentageMenuItem.target = self
+        remainingTimeMenuItem.target = self
+        menu.addItem(percentageMenuItem)
+        menu.addItem(remainingTimeMenuItem)
+        updateDisplayModeMenu()
+        menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit BatteryMenuBar",
                                 action: #selector(NSApp.terminate(_:)),
                                 keyEquivalent: "q"))
         statusItem.menu = menu
+    }
+
+    @objc private func selectPercentage() {
+        setDisplayMode(.percentage)
+    }
+
+    @objc private func selectRemainingTime() {
+        setDisplayMode(.remainingTime)
+    }
+
+    private func setDisplayMode(_ mode: DisplayMode) {
+        displayMode = mode
+        UserDefaults.standard.set(mode.rawValue, forKey: Self.displayModeKey)
+        updateDisplayModeMenu()
+        refreshBattery()
+    }
+
+    private func updateDisplayModeMenu() {
+        percentageMenuItem.state = displayMode == .percentage ? .on : .off
+        remainingTimeMenuItem.state = displayMode == .remainingTime ? .on : .off
     }
 
     // ── IOKit Notification Registration ────────
@@ -210,7 +267,7 @@ final class BatteryApp: NSObject, NSApplicationDelegate {
             return
         }
 
-        // Menu bar button: icon + percentage
+        // Menu bar button: icon + selected battery display
         if let button = statusItem.button {
             if #available(macOS 11.0, *) {
                 let cfg = NSImage.SymbolConfiguration(pointSize: 14, weight: .regular)
@@ -220,7 +277,9 @@ final class BatteryApp: NSObject, NSApplicationDelegate {
                 )?.withSymbolConfiguration(cfg)
                 button.imagePosition = .imageLeading
             }
-            button.title = " \(b.percentage)%"
+            let text = displayMode == .percentage ? "\(b.percentage)%" : b.menuBarTimeText
+            button.title = " \(text)"
+            button.toolTip = "\(b.statusText) — \(b.percentage)%\n\(b.timeText)"
             button.font  = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
         }
 

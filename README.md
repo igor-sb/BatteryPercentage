@@ -45,6 +45,7 @@ make bundle   # → ./BatteryMenuBar.app (proper .app bundle)
 
 Click the battery icon and select **Show Percentage** (the default) or **Show Remaining Time**.
 The selected option is checked, updates immediately, and is remembered after quitting the app.
+Uncheck **Show Battery Icon** for a text-only display; this choice is also remembered.
 Time mode shows estimated battery life, or time until full while charging. It shows
 “Calculating…” when macOS has no estimate, and “Full” or “Plugged In” when connected
 without charging. Hover over the menu bar item for the full status and time details.

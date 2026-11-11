@@ -156,6 +156,9 @@ final class BatteryApp: NSObject, NSApplicationDelegate {
         case remainingTime
     }
 
+    private static let hideBatteryIconKey = "hideBatteryIcon"
+    private var hideBatteryIcon = UserDefaults.standard.bool(forKey: hideBatteryIconKey)
+
     private static let displayModeKey = "menuBarDisplayMode"
     private var displayMode = DisplayMode(
         rawValue: UserDefaults.standard.string(forKey: displayModeKey) ?? ""
@@ -166,6 +169,10 @@ final class BatteryApp: NSObject, NSApplicationDelegate {
     )
     private let remainingTimeMenuItem = NSMenuItem(
         title: "Show Remaining Time", action: #selector(selectRemainingTime), keyEquivalent: ""
+    )
+
+    private let showBatteryIconMenuItem = NSMenuItem(
+        title: "Show Battery Icon", action: #selector(toggleBatteryIcon), keyEquivalent: ""
     )
 
     // Dynamic menu items
@@ -219,6 +226,9 @@ final class BatteryApp: NSObject, NSApplicationDelegate {
         menu.addItem(percentageMenuItem)
         menu.addItem(remainingTimeMenuItem)
         updateDisplayModeMenu()
+        showBatteryIconMenuItem.target = self
+        showBatteryIconMenuItem.state = hideBatteryIcon ? .off : .on
+        menu.addItem(showBatteryIconMenuItem)
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit BatteryMenuBar",
                                 action: #selector(NSApp.terminate(_:)),
@@ -232,6 +242,13 @@ final class BatteryApp: NSObject, NSApplicationDelegate {
 
     @objc private func selectRemainingTime() {
         setDisplayMode(.remainingTime)
+    }
+
+    @objc private func toggleBatteryIcon() {
+        hideBatteryIcon.toggle()
+        UserDefaults.standard.set(hideBatteryIcon, forKey: Self.hideBatteryIconKey)
+        showBatteryIconMenuItem.state = hideBatteryIcon ? .off : .on
+        refreshBattery()
     }
 
     private func setDisplayMode(_ mode: DisplayMode) {
@@ -269,7 +286,9 @@ final class BatteryApp: NSObject, NSApplicationDelegate {
 
         // Menu bar button: icon + selected battery display
         if let button = statusItem.button {
-            if #available(macOS 11.0, *) {
+            button.image = nil
+            button.imagePosition = hideBatteryIcon ? .noImage : .imageLeading
+            if !hideBatteryIcon, #available(macOS 11.0, *) {
                 let cfg = NSImage.SymbolConfiguration(pointSize: 14, weight: .regular)
                 button.image = NSImage(
                     systemSymbolName: b.sfSymbol,
@@ -278,7 +297,7 @@ final class BatteryApp: NSObject, NSApplicationDelegate {
                 button.imagePosition = .imageLeading
             }
             let text = displayMode == .percentage ? "\(b.percentage)%" : b.menuBarTimeText
-            button.title = " \(text)"
+            button.title = button.image == nil ? text : " \(text)"
             button.toolTip = "\(b.statusText) — \(b.percentage)%\n\(b.timeText)"
             button.font  = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
         }
